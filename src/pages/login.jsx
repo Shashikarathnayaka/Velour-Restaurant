@@ -3,9 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // ─── Credentials ──────────────────────────────────────────────────────────────
 const ADMIN_USER = "admin";
-const ADMIN_PASS = "velour2025";
+const ADMIN_PASS = "admin123";
 
-// Guest accounts — email + password
 const GUEST_ACCOUNTS = [
     { email: "guest@velour.lk", password: "guest123" },
     { email: "test@gmail.com", password: "test123" },
@@ -28,11 +27,18 @@ const inputSt = {
     fontSize: "14px",
     outline: "none",
     width: "100%",
+    boxSizing: "border-box",
     borderRadius: 2,
     transition: "border-color 0.25s",
 };
 
-// ─── Floating particles ───────────────────────────────────────────────────────
+const labelSt = {
+    fontSize: "10px", color: MUTED,
+    letterSpacing: "0.2em", textTransform: "uppercase",
+    fontFamily: "'Lato', sans-serif", marginBottom: "7px",
+};
+
+// ─── Particles ────────────────────────────────────────────────────────────────
 function Particles() {
     return (
         <>
@@ -55,46 +61,143 @@ function Particles() {
     );
 }
 
-// ─── Main Login Component ─────────────────────────────────────────────────────
+// ─── Password Strength ────────────────────────────────────────────────────────
+function StrengthBar({ password }) {
+    if (!password) return null;
+    let score = 0;
+    if (password.length >= 6) score++;
+    if (password.length >= 10) score++;
+    if (/[A-Z]/.test(password) && /[0-9]/.test(password)) score++;
+    if (/[^A-Za-z0-9]/.test(password)) score++;
+
+    const colors = [
+        "rgba(200,168,96,0.2)",
+        "rgba(200,168,96,0.5)",
+        "rgba(200,168,96,0.78)",
+        "#C8A860",
+    ];
+    const labels = ["Too short", "Fair", "Good", "Strong"];
+
+    return (
+        <div style={{ marginTop: "7px" }}>
+            <div style={{ display: "flex", gap: "4px", marginBottom: "5px" }}>
+                {[0, 1, 2, 3].map(i => (
+                    <div key={i} style={{
+                        flex: 1, height: "2px", borderRadius: "1px",
+                        background: i < score ? colors[Math.min(score - 1, 3)] : "rgba(200,168,96,0.1)",
+                        transition: "background 0.3s",
+                    }} />
+                ))}
+            </div>
+            <div style={{ fontSize: "10px", color: MUTED, fontFamily: "'Lato', sans-serif" }}>
+                {labels[Math.min(score, 3)]}
+            </div>
+        </div>
+    );
+}
+
+// ─── Switch Link ──────────────────────────────────────────────────────────────
+function SwitchLink({ text, linkText, onClick }) {
+    const [hover, setHover] = useState(false);
+    return (
+        <div style={{ marginTop: "1.4rem", textAlign: "center", fontFamily: "'Lato', sans-serif", fontSize: "12px", color: MUTED }}>
+            {text}{" "}
+            <span
+                onClick={onClick}
+                onMouseEnter={() => setHover(true)}
+                onMouseLeave={() => setHover(false)}
+                style={{ color: hover ? G : "rgba(200,168,96,0.7)", cursor: "pointer", transition: "color 0.2s" }}
+            >
+                {linkText}
+            </span>
+        </div>
+    );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function Login({ onAdmin, onGuest }) {
-    const [tab, setTab] = useState("admin"); // "admin" | "guest"
-    const [u, setU] = useState("");
-    const [p, setP] = useState("");
-    const [email, setEmail] = useState("");
-    const [guestPass, setGuestPass] = useState("");
-    const [err, setErr] = useState("");
+    const [tab, setTab] = useState("login"); // "login" | "register"
     const [shakeKey, setShakeKey] = useState(0);
     const [loading, setLoading] = useState(false);
 
-    const shake = (msg) => {
-        setErr(msg);
-        setShakeKey(k => k + 1);
+    // Login state
+    const [identifier, setIdentifier] = useState("");
+    const [password, setPassword] = useState("");
+    const [loginErr, setLoginErr] = useState("");
+    const [loginOk, setLoginOk] = useState("");
+
+    // Register state
+    const [firstName, setFirstName] = useState("");
+    const [lastName, setLastName] = useState("");
+    const [email, setEmail] = useState("");
+    const [regPass, setRegPass] = useState("");
+    const [confirm, setConfirm] = useState("");
+    const [regErr, setRegErr] = useState("");
+    const [regOk, setRegOk] = useState("");
+
+    const shake = () => setShakeKey(k => k + 1);
+
+    const switchTab = (t) => {
+        setTab(t);
+        setLoginErr(""); setLoginOk("");
+        setRegErr(""); setRegOk("");
     };
 
-    const handleAdmin = () => {
-        if (u === ADMIN_USER && p === ADMIN_PASS) {
+    // ── Login handler ─────────────────────────────────────────────────────────
+    const handleLogin = () => {
+        setLoginErr(""); setLoginOk("");
+        if (!identifier || !password) {
+            setLoginErr("Please enter your credentials."); shake(); return;
+        }
+        // Admin check — silent, no tab needed
+        if (identifier === ADMIN_USER && password === ADMIN_PASS) {
             setLoading(true);
             setTimeout(() => onAdmin(), 800);
-        } else {
-            shake("Invalid credentials. Check username & password.");
+            return;
         }
-    };
-
-    const handleGuest = () => {
+        // Registered guest check
         const match = GUEST_ACCOUNTS.find(
-            a => a.email === email && a.password === guestPass
+            a => a.email === identifier && a.password === password
         );
         if (match) {
             setLoading(true);
             setTimeout(() => onGuest(), 800);
-        } else {
-            shake("No account found. Check your email & password.");
+            return;
         }
+        // Any valid email format → allow as guest
+        if (identifier.includes("@")) {
+            setLoading(true);
+            setTimeout(() => onGuest(), 800);
+            return;
+        }
+        setLoginErr("Invalid credentials. Use your email address or admin login.");
+        shake();
     };
 
-    const handleKey = (e) => {
-        if (e.key === "Enter") tab === "admin" ? handleAdmin() : handleGuest();
+    // ── Register handler ──────────────────────────────────────────────────────
+    const handleRegister = () => {
+        setRegErr(""); setRegOk("");
+        if (!firstName || !lastName || !email || !regPass || !confirm) {
+            setRegErr("Please fill in all fields."); shake(); return;
+        }
+        if (!email.includes("@")) {
+            setRegErr("Please enter a valid email address."); shake(); return;
+        }
+        if (regPass.length < 6) {
+            setRegErr("Password must be at least 6 characters."); shake(); return;
+        }
+        if (regPass !== confirm) {
+            setRegErr("Passwords do not match."); shake(); return;
+        }
+        setLoading(true);
+        setTimeout(() => {
+            setLoading(false);
+            setRegOk(`Welcome, ${firstName}! Your account has been created.`);
+            setTimeout(() => onGuest(), 1200);
+        }, 800);
     };
+
+    const handleKey = (e, fn) => { if (e.key === "Enter") fn(); };
 
     return (
         <div style={{
@@ -102,7 +205,6 @@ export default function Login({ onAdmin, onGuest }) {
             display: "flex", alignItems: "center", justifyContent: "center",
             position: "relative", overflow: "hidden",
         }}>
-            {/* Background glow */}
             <div style={{
                 position: "absolute", inset: 0, pointerEvents: "none",
                 background: "radial-gradient(ellipse at 30% 50%, rgba(200,168,96,0.05) 0%, transparent 60%), radial-gradient(ellipse at 70% 40%, rgba(200,168,96,0.04) 0%, transparent 55%)",
@@ -115,15 +217,15 @@ export default function Login({ onAdmin, onGuest }) {
                 animate={shakeKey > 0
                     ? { x: [-10, 10, -7, 7, 0], opacity: 1, y: 0 }
                     : { opacity: 1, y: 0 }}
-                transition={{ duration: shakeKey > 0 ? 0.4 : 0.7, ease: "easeOut" }}
+                transition={{ duration: shakeKey > 0 ? 0.38 : 0.7, ease: "easeOut" }}
                 style={{
-                    width: 420, position: "relative", zIndex: 1,
+                    width: 440, position: "relative", zIndex: 1,
                     border: `0.5px solid ${BORDER}`, background: CARD,
                     padding: "2.75rem 2.5rem",
                 }}
             >
-                {/* Logo */}
-                <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
+                {/* ── Logo ── */}
+                <div style={{ textAlign: "center", marginBottom: "0" }}>
                     <motion.div
                         initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2, duration: 0.7 }}
@@ -138,18 +240,17 @@ export default function Login({ onAdmin, onGuest }) {
                     >
                         Fine Dining · Est. 2019
                     </motion.div>
-                    {/* Divider */}
                     <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginTop: "2rem" }}>
                         <div style={{ flex: 1, height: "0.5px", background: BORDER }} />
-                        <div style={{ fontSize: "10px", color: MUTED, letterSpacing: "0.2em", fontFamily: "'Lato', sans-serif", textTransform: "uppercase" }}>Sign In</div>
+                        <div style={{ fontSize: "10px", color: MUTED, letterSpacing: "0.2em", fontFamily: "'Lato', sans-serif", textTransform: "uppercase" }}>Welcome</div>
                         <div style={{ flex: 1, height: "0.5px", background: BORDER }} />
                     </div>
                 </div>
 
-                {/* Tabs */}
-                <div style={{ display: "flex", marginBottom: "2rem", borderBottom: `0.5px solid ${BORDER}` }}>
-                    {[["admin", "Admin Portal"], ["guest", "Guest Access"]].map(([id, label]) => (
-                        <button key={id} onClick={() => { setTab(id); setErr(""); }}
+                {/* ── Tabs ── */}
+                <div style={{ display: "flex", marginBottom: "1.8rem", marginTop: "1.6rem", borderBottom: `0.5px solid ${BORDER}` }}>
+                    {[["login", "Sign In"], ["register", "Create Account"]].map(([id, label]) => (
+                        <button key={id} onClick={() => switchTab(id)}
                             style={{
                                 flex: 1, background: "none", border: "none", cursor: "pointer",
                                 padding: "0.65rem 0",
@@ -164,36 +265,48 @@ export default function Login({ onAdmin, onGuest }) {
                     ))}
                 </div>
 
-                {/* Forms */}
+                {/* ── Forms ── */}
                 <AnimatePresence mode="wait">
-                    {tab === "admin" ? (
-                        <motion.div key="admin"
-                            initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 16 }} transition={{ duration: 0.28 }}
+                    {tab === "login" ? (
+                        <motion.div key="login"
+                            initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 14 }} transition={{ duration: 0.26 }}
                         >
                             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                                 <div>
-                                    <div style={{ fontSize: "10px", color: MUTED, letterSpacing: "0.2em", textTransform: "uppercase", fontFamily: "'Lato', sans-serif", marginBottom: "7px" }}>Username</div>
-                                    <input style={inputSt} value={u} onChange={e => setU(e.target.value)} onKeyDown={handleKey}
-                                        placeholder="admin"
+                                    <div style={labelSt}>Username or Email</div>
+                                    <input style={inputSt} value={identifier}
+                                        onChange={e => setIdentifier(e.target.value)}
+                                        onKeyDown={e => handleKey(e, handleLogin)}
+                                        placeholder="admin or email@example.com"
                                         onFocus={e => e.target.style.borderColor = G}
                                         onBlur={e => e.target.style.borderColor = BORDER} />
                                 </div>
                                 <div>
-                                    <div style={{ fontSize: "10px", color: MUTED, letterSpacing: "0.2em", textTransform: "uppercase", fontFamily: "'Lato', sans-serif", marginBottom: "7px" }}>Password</div>
-                                    <input style={inputSt} type="password" value={p} onChange={e => setP(e.target.value)} onKeyDown={handleKey}
+                                    <div style={labelSt}>Password</div>
+                                    <input style={inputSt} type="password" value={password}
+                                        onChange={e => setPassword(e.target.value)}
+                                        onKeyDown={e => handleKey(e, handleLogin)}
                                         placeholder="••••••••"
                                         onFocus={e => e.target.style.borderColor = G}
                                         onBlur={e => e.target.style.borderColor = BORDER} />
                                 </div>
-                                {err && (
+
+                                {loginErr && (
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                                         style={{ fontSize: "12px", color: "#e05555", fontFamily: "'Lato', sans-serif" }}>
-                                        {err}
+                                        {loginErr}
                                     </motion.div>
                                 )}
+                                {loginOk && (
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                        style={{ fontSize: "12px", color: "#7cba6e", fontFamily: "'Lato', sans-serif" }}>
+                                        ✓ {loginOk}
+                                    </motion.div>
+                                )}
+
                                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                                    onClick={handleAdmin}
+                                    onClick={handleLogin}
                                     style={{
                                         background: G, color: BG, border: "none", padding: "14px",
                                         fontFamily: "'Lato', sans-serif", fontSize: "12px",
@@ -201,62 +314,112 @@ export default function Login({ onAdmin, onGuest }) {
                                         cursor: "pointer", borderRadius: 2, marginTop: "4px",
                                         opacity: loading ? 0.7 : 1,
                                     }}>
-                                    {loading ? "Signing in..." : "Enter Admin Panel"}
+                                    {loading ? "Signing in..." : "Sign In"}
                                 </motion.button>
                             </div>
+                            <SwitchLink
+                                text="Don't have an account?"
+                                linkText="Create one"
+                                onClick={() => switchTab("register")}
+                            />
                         </motion.div>
+
                     ) : (
-                        <motion.div key="guest"
-                            initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.28 }}
+                        <motion.div key="register"
+                            initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -14 }} transition={{ duration: 0.26 }}
                         >
                             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                                {/* Name row */}
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                                    <div>
+                                        <div style={labelSt}>First Name</div>
+                                        <input style={inputSt} value={firstName}
+                                            onChange={e => setFirstName(e.target.value)}
+                                            onKeyDown={e => handleKey(e, handleRegister)}
+                                            placeholder="Amal"
+                                            onFocus={e => e.target.style.borderColor = G}
+                                            onBlur={e => e.target.style.borderColor = BORDER} />
+                                    </div>
+                                    <div>
+                                        <div style={labelSt}>Last Name</div>
+                                        <input style={inputSt} value={lastName}
+                                            onChange={e => setLastName(e.target.value)}
+                                            onKeyDown={e => handleKey(e, handleRegister)}
+                                            placeholder="Perera"
+                                            onFocus={e => e.target.style.borderColor = G}
+                                            onBlur={e => e.target.style.borderColor = BORDER} />
+                                    </div>
+                                </div>
+
                                 <div>
-                                    <div style={{ fontSize: "10px", color: MUTED, letterSpacing: "0.2em", textTransform: "uppercase", fontFamily: "'Lato', sans-serif", marginBottom: "7px" }}>Email Address</div>
-                                    <input style={inputSt} type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={handleKey}
+                                    <div style={labelSt}>Email Address</div>
+                                    <input style={inputSt} type="email" value={email}
+                                        onChange={e => setEmail(e.target.value)}
+                                        onKeyDown={e => handleKey(e, handleRegister)}
                                         placeholder="you@example.com"
                                         onFocus={e => e.target.style.borderColor = G}
                                         onBlur={e => e.target.style.borderColor = BORDER} />
                                 </div>
+
                                 <div>
-                                    <div style={{ fontSize: "10px", color: MUTED, letterSpacing: "0.2em", textTransform: "uppercase", fontFamily: "'Lato', sans-serif", marginBottom: "7px" }}>Password</div>
-                                    <input style={inputSt} type="password" value={guestPass} onChange={e => setGuestPass(e.target.value)} onKeyDown={handleKey}
+                                    <div style={labelSt}>Password</div>
+                                    <input style={inputSt} type="password" value={regPass}
+                                        onChange={e => setRegPass(e.target.value)}
+                                        onKeyDown={e => handleKey(e, handleRegister)}
+                                        placeholder="••••••••"
+                                        onFocus={e => e.target.style.borderColor = G}
+                                        onBlur={e => e.target.style.borderColor = BORDER} />
+                                    <StrengthBar password={regPass} />
+                                </div>
+
+                                <div>
+                                    <div style={labelSt}>Confirm Password</div>
+                                    <input style={inputSt} type="password" value={confirm}
+                                        onChange={e => setConfirm(e.target.value)}
+                                        onKeyDown={e => handleKey(e, handleRegister)}
                                         placeholder="••••••••"
                                         onFocus={e => e.target.style.borderColor = G}
                                         onBlur={e => e.target.style.borderColor = BORDER} />
                                 </div>
-                                {err && (
+
+                                {regErr && (
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                                         style={{ fontSize: "12px", color: "#e05555", fontFamily: "'Lato', sans-serif" }}>
-                                        {err}
+                                        {regErr}
                                     </motion.div>
                                 )}
+                                {regOk && (
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                        style={{ fontSize: "12px", color: "#7cba6e", fontFamily: "'Lato', sans-serif" }}>
+                                        ✓ {regOk}
+                                    </motion.div>
+                                )}
+
                                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                                    onClick={handleGuest}
+                                    onClick={handleRegister}
                                     style={{
-                                        background: "transparent", color: G,
-                                        border: `0.5px solid rgba(200,168,96,0.45)`,
-                                        padding: "14px", fontFamily: "'Lato', sans-serif", fontSize: "12px",
+                                        background: G, color: BG, border: "none", padding: "14px",
+                                        fontFamily: "'Lato', sans-serif", fontSize: "12px",
                                         letterSpacing: "0.18em", textTransform: "uppercase",
                                         cursor: "pointer", borderRadius: 2, marginTop: "4px",
                                         opacity: loading ? 0.7 : 1,
                                     }}>
-                                    {loading ? "Signing in..." : "View Restaurant"}
+                                    {loading ? "Creating Account..." : "Create Account"}
                                 </motion.button>
-
-                                {/* Demo hint */}
-                                <div style={{ borderTop: `0.5px solid ${BORDER}`, paddingTop: "1rem", textAlign: "center" }}>
-                                    <div style={{ fontSize: "11px", color: MUTED, fontFamily: "'Lato', sans-serif", marginBottom: "6px", letterSpacing: "0.05em" }}>Demo credentials</div>
-                                    <div style={{ fontSize: "12px", color: "rgba(200,168,96,0.5)", fontFamily: "'Lato', sans-serif" }}>guest@velour.lk / guest123</div>
-                                </div>
                             </div>
+                            <SwitchLink
+                                text="Already have an account?"
+                                linkText="Sign in"
+                                onClick={() => switchTab("login")}
+                            />
                         </motion.div>
                     )}
                 </AnimatePresence>
 
                 {/* Footer */}
-                <div style={{ marginTop: "2rem", textAlign: "center" }}>
-                    <div style={{ fontSize: "10px", color: "rgba(245,237,216,0.2)", fontFamily: "'Lato', sans-serif", letterSpacing: "0.1em" }}>
+                <div style={{ marginTop: "1.75rem", textAlign: "center" }}>
+                    <div style={{ fontSize: "10px", color: "rgba(245,237,216,0.18)", fontFamily: "'Lato', sans-serif", letterSpacing: "0.1em" }}>
                         Colombo · Sri Lanka
                     </div>
                 </div>
