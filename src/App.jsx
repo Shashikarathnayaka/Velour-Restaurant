@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, useMotionValue, useSpring, useTransform, AnimatePresence } from "framer-motion";
-
+import { useNavigate } from "react-router-dom";
 // ─── Data ───────────────────────────────────────────────────────────────────
 
 const menuData = {
@@ -43,7 +43,7 @@ function useInView(threshold = 0.15) {
   return [ref, inView];
 }
 
-// ─── Mouse-follower image (appears near cursor on menu hover) ────────────────
+// ─── Mouse-follower image ─────────────────────────────────────────────────────
 
 function MouseFollowerImage({ src, visible }) {
   const x = useMotionValue(0);
@@ -75,7 +75,7 @@ function MouseFollowerImage({ src, visible }) {
   );
 }
 
-// ─── Hero floating dishes with parallax mouse tracking ───────────────────────
+// ─── Hero Parallax Bg ─────────────────────────────────────────────────────────
 
 function HeroParallaxBg() {
   const mouseX = useMotionValue(0);
@@ -130,7 +130,8 @@ function HeroParallaxBg() {
 
 // ─── Nav ─────────────────────────────────────────────────────────────────────
 
-function Nav({ active, setActive }) {
+function Nav({ active, setActive, onJoinUs }) {
+  const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const h = () => setScrolled(window.scrollY > 60);
@@ -154,7 +155,8 @@ function Nav({ active, setActive }) {
       }}
     >
       <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "22px", color: "#C8A860", letterSpacing: "0.05em" }}>VELOUR</div>
-      <div style={{ display: "flex", gap: "2rem" }}>
+
+      <div style={{ display: "flex", gap: "2rem", alignItems: "center" }}>
         {links.map(l => (
           <motion.button key={l} whileHover={{ y: -2 }}
             onClick={() => { setActive(l); document.getElementById(l.toLowerCase())?.scrollIntoView({ behavior: "smooth" }); }}
@@ -169,6 +171,38 @@ function Nav({ active, setActive }) {
             {l}
           </motion.button>
         ))}
+
+        {/* Join Us button */}
+        <motion.button
+          whileHover={{
+            y: -2,
+            scale: 1.03,
+            background: "#C8A860",
+            color: "#0A0806"
+          }}
+          whileTap={{ scale: 0.96 }}
+
+          /* =========================
+             NEW : Navigate to Login
+          ========================= */
+          onClick={() => navigate("/login")}
+
+          transition={{ duration: 0.2 }}
+          style={{
+            background: "transparent",
+            border: "1px solid rgba(200,168,96,0.55)",
+            color: "#C8A860",
+            padding: "7px 20px",
+            fontFamily: "'Lato', sans-serif",
+            fontSize: "11px",
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            cursor: "pointer",
+            transition: "background 0.25s, color 0.25s",
+          }}
+        >
+          Join Us
+        </motion.button>
       </div>
     </motion.nav>
   );
@@ -234,7 +268,7 @@ function Hero() {
   );
 }
 
-// ─── About ───────────────────────────────────────────────────────────────────
+// ─── About ────────────────────────────────────────────────────────────────────
 
 function About() {
   const [ref, inView] = useInView();
@@ -280,7 +314,7 @@ function About() {
   );
 }
 
-// ─── Menu with mouse-follower images ─────────────────────────────────────────
+// ─── Menu ─────────────────────────────────────────────────────────────────────
 
 function Menu() {
   const [activeTab, setActiveTab] = useState("Starters");
@@ -298,7 +332,6 @@ function Menu() {
           <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "52px", color: "#F5EDD8", fontWeight: 400 }}>Our Menu</h2>
           <p style={{ color: "rgba(245,237,216,0.32)", fontFamily: "'Lato', sans-serif", fontSize: "13px", marginTop: "0.75rem", letterSpacing: "0.05em" }}>hover over a dish to preview</p>
         </motion.div>
-
         <div style={{ display: "flex", justifyContent: "center", marginBottom: "3.5rem", borderBottom: "0.5px solid rgba(200,168,96,0.15)" }}>
           {Object.keys(menuData).map(tab => (
             <motion.button key={tab} whileHover={{ y: -1 }}
@@ -314,7 +347,6 @@ function Menu() {
             </motion.button>
           ))}
         </div>
-
         <AnimatePresence mode="wait">
           <motion.div key={animKey} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} transition={{ duration: 0.38 }}>
             {menuData[activeTab].map((item, i) => (
@@ -346,7 +378,7 @@ function Menu() {
   );
 }
 
-// ─── Gallery with 3D tilt on mouse move ──────────────────────────────────────
+// ─── Gallery ──────────────────────────────────────────────────────────────────
 
 function GalleryCard({ img }) {
   const cardRef = useRef(null);
@@ -482,7 +514,7 @@ function Reserve() {
   );
 }
 
-// ─── Footer ──────────────────────────────────────────────────────────────────
+// ─── Footer ───────────────────────────────────────────────────────────────────
 
 function Footer() {
   return (
@@ -517,10 +549,13 @@ function Footer() {
   );
 }
 
-// ─── App ─────────────────────────────────────────────────────────────────────
+// ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
+  const navigate = useNavigate();
   const [active, setActive] = useState("Home");
+  const [showLogin, setShowLogin] = useState(false);
+
   useEffect(() => {
     const sections = ["home", "about", "menu", "gallery", "reserve"];
     const obs = new IntersectionObserver((entries) => {
@@ -529,6 +564,12 @@ export default function App() {
     sections.forEach(id => { const el = document.getElementById(id); if (el) obs.observe(el); });
     return () => obs.disconnect();
   }, []);
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    document.body.style.overflow = showLogin ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [showLogin]);
 
   return (
     <>
@@ -540,8 +581,20 @@ export default function App() {
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: #0A0806; }
         ::-webkit-scrollbar-thumb { background: rgba(200,168,96,0.28); border-radius: 2px; }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.6) sepia(1) saturate(2) hue-rotate(5deg); }
       `}</style>
-      <Nav active={active} setActive={setActive} />
+
+      {/* <Nav active={active} setActive={setActive} onJoinUs={() => setShowLogin(true)} /> */}
+      <Nav
+        active={active}
+        setActive={setActive}
+        onJoinUs={() => navigate("/login")}
+      />
+
+      <AnimatePresence>
+        {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
+      </AnimatePresence>
+
       <Hero />
       <About />
       <Menu />
